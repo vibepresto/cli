@@ -1009,12 +1009,12 @@ async function fileBlob(filePath) {
 
 function openBrowser(url) {
     const commands = process.platform === 'win32'
-        ? [['cmd.exe', ['/c', 'start', '', url]]]
+        ? [['cmd.exe', ['/c', 'start', '""', '"' + url.replace(/"/g, '\\"') + '"']]]
         : process.platform === 'darwin'
             ? [['open', [url]]]
             : [
-                ['cmd.exe', ['/c', 'start', '', url]],
                 ['xdg-open', [url]],
+                ['open', [url]],
             ];
 
     for (const [command, args] of commands) {
