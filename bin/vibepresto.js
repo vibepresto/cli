@@ -92,14 +92,15 @@ async function startLogin(options, json) {
     }
 
     const authorization = response.data;
+    const verificationUrl = getVerificationUrl(authorization);
     if (! json) {
         process.stderr.write('Open this URL and approve the CLI:\n');
-        process.stderr.write(authorization.verification_url + '\n');
+        process.stderr.write(verificationUrl + '\n');
         process.stderr.write('User code: ' + authorization.user_code + '\n');
     }
 
-    if (! options.noOpen) {
-        openBrowser(authorization.verification_url);
+    if (! options.noOpen && verificationUrl) {
+        openBrowser(verificationUrl);
     }
 
     const timeoutAt = Date.now() + authorization.expires_in * 1000;
@@ -141,7 +142,7 @@ async function startLogin(options, json) {
             site_url: site,
             device_code: authorization.device_code,
             user_code: authorization.user_code,
-            verification_url: authorization.verification_url,
+            verification_url: verificationUrl,
         }
     );
 }
@@ -698,8 +699,9 @@ function emitSuccess(data, json) {
         return;
     }
 
-    if (data.verification_url) {
-        process.stdout.write('Verification URL: ' + data.verification_url + '\n');
+    const verificationUrl = getVerificationUrl(data);
+    if (verificationUrl) {
+        process.stdout.write('Verification URL: ' + verificationUrl + '\n');
     }
 
     if (data.user_code) {
@@ -800,6 +802,22 @@ function normalizeSiteUrl(value) {
 
 function sanitizeFileComponent(value) {
     return value.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'bundle';
+}
+
+function getVerificationUrl(data) {
+    if (! data || typeof data !== 'object') {
+        return '';
+    }
+
+    if (typeof data.verification_url_complete === 'string' && data.verification_url_complete) {
+        return data.verification_url_complete;
+    }
+
+    if (typeof data.verification_url === 'string' && data.verification_url) {
+        return data.verification_url;
+    }
+
+    return '';
 }
 
 async function fileBlob(filePath) {
