@@ -95,6 +95,28 @@ async function main() {
         return;
     }
 
+    if (command === 'bundles' && subcommand === 'list') {
+        const client = await createAuthenticatedClient(options);
+        const response = await client.request('/bundles');
+        emitSuccess(response.data, json);
+        return;
+    }
+
+    if (command === 'bundles' && subcommand === 'versions') {
+        const client = await createAuthenticatedClient(options);
+        const bundleId = positiveIntOption(options.bundleId, '--bundle-id is required for `bundles versions`.');
+        const response = await client.request('/bundles/' + bundleId + '/versions');
+        emitSuccess(response.data, json);
+        return;
+    }
+
+    if (command === 'bundles' && subcommand === 'rollback') {
+        const client = await createAuthenticatedClient(options);
+        const response = await rollbackBundle(client, options);
+        emitSuccess(response.data, json);
+        return;
+    }
+
     throw cliError('usage_error', 'Unknown command.', EXIT_USAGE);
 }
 
@@ -279,6 +301,24 @@ async function uploadBundle(client, options) {
             await input.cleanup();
         }
     }
+}
+
+async function rollbackBundle(client, options) {
+    const pageId = positiveIntOption(options.pageId, '--page-id is required for `bundles rollback`.');
+    const bundleVersionId = options.bundleVersionId ? positiveIntOption(options.bundleVersionId, '--bundle-version-id must be a positive integer.') : 0;
+    const versionNumber = options.version ? positiveIntOption(options.version, '--version must be a positive integer.') : 0;
+
+    if (! bundleVersionId && ! versionNumber) {
+        throw cliError('usage_error', 'Provide either --bundle-version-id or --version for `bundles rollback`.', EXIT_USAGE);
+    }
+
+    return await client.request('/pages/' + pageId + '/bundle-rollback', {
+        method: 'POST',
+        json: {
+            bundle_version_id: bundleVersionId || undefined,
+            version_number: versionNumber || undefined,
+        },
+    });
 }
 
 async function listPages(client, options) {
@@ -768,6 +808,9 @@ function printHelp() {
         '  vibepresto pages create --site <url> --title <title> [--slug <slug>] [--status <status>] [--content <html>] [--json]',
         '  vibepresto pages set-status --site <url> --page-id <id> --status <status> [--json]',
         '  vibepresto pages set-homepage --site <url> --page-id <id> [--json]',
+        '  vibepresto bundles list --site <url> [--json]',
+        '  vibepresto bundles versions --site <url> --bundle-id <id> [--json]',
+        '  vibepresto bundles rollback --site <url> --page-id <id> (--version <n> | --bundle-version-id <id>) [--json]',
         '  vibepresto upload --site <url> --site-dir <dir> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --zip <file> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --html <file> [--css <file>] [--js <file>] [--asset <file> ...] [--name <label>] [--page-id <id>] [--json]',
@@ -791,12 +834,25 @@ function emitSuccess(data, json) {
         process.stdout.write('User code: ' + data.user_code + '\n');
     }
 
-    if (Array.isArray(data.items)) {
+    if (Array.isArray(data.items) && data.items.length > 0 && Object.prototype.hasOwnProperty.call(data.items[0], 'slug')) {
         process.stdout.write('Pages: ' + data.items.length + '\n');
         for (const item of data.items) {
             const status = item.status ? ' [' + item.status + ']' : '';
             const homepage = item.is_homepage ? ' (homepage)' : '';
             process.stdout.write('- ' + item.id + ': ' + item.title + status + homepage + '\n');
+        }
+    } else if (Array.isArray(data.items) && data.items.length > 0 && Object.prototype.hasOwnProperty.call(data.items[0], 'bundle_version_id') && ! Object.prototype.hasOwnProperty.call(data.items[0], 'version_count')) {
+        process.stdout.write('Bundle versions: ' + data.items.length + '\n');
+        for (const item of data.items) {
+            const current = item.is_current ? ' (current)' : '';
+            process.stdout.write('- ' + item.bundle_version_id + ': ' + item.bundle_version_label + current + '\n');
+        }
+    } else if (Array.isArray(data.items) && data.items.length > 0 && Object.prototype.hasOwnProperty.call(data.items[0], 'lineage_id')) {
+        process.stdout.write('Bundles: ' + data.items.length + '\n');
+        for (const item of data.items) {
+            const version = item.bundle_version_number ? ' v' + item.bundle_version_number : '';
+            const count = item.version_count ? ' (' + item.version_count + ' versions)' : '';
+            process.stdout.write('- ' + item.lineage_id + ': ' + item.bundle_title + version + count + '\n');
         }
     } else if (data.bundle_title) {
         process.stdout.write('Uploaded bundle: ' + data.bundle_title + '\n');
@@ -814,6 +870,18 @@ function emitSuccess(data, json) {
 
     if (data.assigned_page_url) {
         process.stdout.write('Assigned page: ' + data.assigned_page_url + '\n');
+    }
+
+    if (data.bundle_version_label) {
+        process.stdout.write('Bundle version: ' + data.bundle_version_label + '\n');
+    }
+
+    if (data.bundle_version_number) {
+        process.stdout.write('Version number: ' + data.bundle_version_number + '\n');
+    }
+
+    if (data.lineage_name) {
+        process.stdout.write('Bundle lineage: ' + data.lineage_name + '\n');
     }
 
     if (data.page_status) {

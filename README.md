@@ -1,6 +1,6 @@
 # VibePresto CLI
 
-CLI for managing WordPress pages and uploading VibePresto bundles through the plugin API.
+CLI for managing WordPress pages and versioned VibePresto bundles through the plugin API.
 
 ## Current scope
 
@@ -11,6 +11,8 @@ This first pass targets simple static sites:
 - no build step, framework output detection, or dependency installation
 
 If you point the CLI at a local site folder, it verifies local HTML/CSS/JS references, creates a temporary ZIP bundle, and uploads that ZIP for you.
+
+When you upload to a page that already has a VibePresto bundle assigned, the new upload becomes the next version in that same bundle lineage automatically.
 
 ## Use with npx
 
@@ -65,6 +67,34 @@ Search WordPress pages before assigning a bundle:
 
 ```bash
 npx vibepresto pages search --site http://localhost:8000 --query Home --json
+```
+
+### `bundles list`
+
+List bundle lineages and their current versions:
+
+```bash
+npx vibepresto bundles list --site http://localhost:8000 --json
+```
+
+### `bundles versions`
+
+List all versions for a bundle lineage:
+
+```bash
+npx vibepresto bundles versions --site http://localhost:8000 --bundle-id 12 --json
+```
+
+### `bundles rollback`
+
+Roll a page back to an earlier bundle version:
+
+```bash
+npx vibepresto bundles rollback \
+  --site http://localhost:8000 \
+  --page-id 2 \
+  --version 1 \
+  --json
 ```
 
 ### `pages list`
@@ -134,6 +164,8 @@ npx vibepresto upload \
   --page-id 2 \
   --json
 ```
+
+If page `2` already has a VibePresto bundle assigned, this upload becomes the next version in that same lineage instead of creating an unrelated duplicate bundle.
 
 Folder mode rules:
 
