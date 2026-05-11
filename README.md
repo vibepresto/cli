@@ -17,7 +17,7 @@ If you point the CLI at a local site folder, it verifies local HTML/CSS/JS refer
 Run the published CLI without installing globally:
 
 ```bash
-npx @vibepresto/cli --help
+npx vibepresto --help
 ```
 
 ## Run locally
@@ -35,20 +35,20 @@ node ./bin/vibepresto.js --help
 Start device-style login and wait for approval:
 
 ```bash
-npx @vibepresto/cli login --site http://localhost:8000
+npx vibepresto login --site http://localhost:8000
 ```
 
 Skip browser auto-open:
 
 ```bash
-npx @vibepresto/cli login --site http://localhost:8000 --no-open
+npx vibepresto login --site http://localhost:8000 --no-open
 ```
 
 Manual flow:
 
 ```bash
-npx @vibepresto/cli login --site http://localhost:8000 --manual --json
-npx @vibepresto/cli login --site http://localhost:8000 --device-code <device_code> --completion-code <completion_code>
+npx vibepresto login --site http://localhost:8000 --manual --json
+npx vibepresto login --site http://localhost:8000 --device-code <device_code> --completion-code <completion_code>
 ```
 
 ### `whoami`
@@ -56,7 +56,7 @@ npx @vibepresto/cli login --site http://localhost:8000 --device-code <device_cod
 Inspect the active saved session:
 
 ```bash
-npx @vibepresto/cli whoami --site http://localhost:8000 --json
+npx vibepresto whoami --site http://localhost:8000 --json
 ```
 
 ### `pages search`
@@ -64,7 +64,7 @@ npx @vibepresto/cli whoami --site http://localhost:8000 --json
 Search WordPress pages before assigning a bundle:
 
 ```bash
-npx @vibepresto/cli pages search --site http://localhost:8000 --query Home --json
+npx vibepresto pages search --site http://localhost:8000 --query Home --json
 ```
 
 ### `upload` with auto-bundling
@@ -72,7 +72,7 @@ npx @vibepresto/cli pages search --site http://localhost:8000 --query Home --jso
 Point at a local static site folder:
 
 ```bash
-npx @vibepresto/cli upload \
+npx vibepresto upload \
   --site http://localhost:8000 \
   --site-dir ./landing-page \
   --name "Landing page" \
@@ -82,7 +82,7 @@ npx @vibepresto/cli upload \
 Upload and assign to a page:
 
 ```bash
-npx @vibepresto/cli upload \
+npx vibepresto upload \
   --site http://localhost:8000 \
   --site-dir ./landing-page \
   --name "Landing page" \
@@ -99,7 +99,7 @@ Folder mode rules:
 ### `upload` with an existing ZIP
 
 ```bash
-npx @vibepresto/cli upload \
+npx vibepresto upload \
   --site http://localhost:8000 \
   --zip ./landing-page.zip \
   --name "Prebuilt bundle" \
@@ -109,7 +109,7 @@ npx @vibepresto/cli upload \
 ### `upload` with explicit files
 
 ```bash
-npx @vibepresto/cli upload \
+npx vibepresto upload \
   --site http://localhost:8000 \
   --html ./site/index.html \
   --css ./site/style.css \
@@ -121,7 +121,7 @@ npx @vibepresto/cli upload \
 Add extra assets:
 
 ```bash
-npx @vibepresto/cli upload \
+npx vibepresto upload \
   --site http://localhost:8000 \
   --html ./site/index.html \
   --css ./site/style.css \
@@ -137,13 +137,13 @@ npx @vibepresto/cli upload \
 Clear local credentials:
 
 ```bash
-npx @vibepresto/cli logout --site http://localhost:8000
+npx vibepresto logout --site http://localhost:8000
 ```
 
 Clear local credentials and revoke the remote session:
 
 ```bash
-npx @vibepresto/cli logout --site http://localhost:8000 --revoke
+npx vibepresto logout --site http://localhost:8000 --revoke
 ```
 
 ## JSON output
@@ -177,9 +177,9 @@ Failure shape:
 Typical agent flow:
 
 ```bash
-npx @vibepresto/cli whoami --site http://localhost:8000 --json
-npx @vibepresto/cli pages search --site http://localhost:8000 --query sample-page --json
-npx @vibepresto/cli upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
+npx vibepresto whoami --site http://localhost:8000 --json
+npx vibepresto pages search --site http://localhost:8000 --query sample-page --json
+npx vibepresto upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
 ```
 
 The CLI is meant to be the main automation surface for Codex or other agents. Prefer `--json` so the caller can branch on stable response data.

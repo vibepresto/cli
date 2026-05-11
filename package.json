@@ -1,7 +1,14 @@
 {
-  "name": "@vibepresto/cli",
+  "name": "vibepresto",
   "version": "0.1.0",
   "description": "CLI for uploading VibePresto bundles to WordPress.",
+  "keywords": [
+    "vibepresto",
+    "wordpress",
+    "cli",
+    "deploy",
+    "static-site"
+  ],
   "bin": {
     "vibepresto": "./bin/vibepresto.js"
   },
@@ -9,5 +16,16 @@
     "bin"
   ],
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VibePresto/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VibePresto/cli/issues"
+  },
+  "homepage": "https://github.com/VibePresto/cli#readme",
   "license": "MIT"
 }
