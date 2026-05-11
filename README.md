@@ -12,12 +12,20 @@ This first pass targets simple static sites:
 
 If you point the CLI at a local site folder, it verifies local HTML/CSS/JS references, creates a temporary ZIP bundle, and uploads that ZIP for you.
 
+## Use with npx
+
+Run the published CLI without installing globally:
+
+```bash
+npx @vibepresto/cli --help
+```
+
 ## Run locally
 
 From this repo:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js --help
+node ./bin/vibepresto.js --help
 ```
 
 ## Commands
@@ -27,20 +35,20 @@ node packages/vibepresto-cli/bin/vibepresto.js --help
 Start device-style login and wait for approval:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js login --site http://localhost:8000
+npx @vibepresto/cli login --site http://localhost:8000
 ```
 
 Skip browser auto-open:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js login --site http://localhost:8000 --no-open
+npx @vibepresto/cli login --site http://localhost:8000 --no-open
 ```
 
 Manual flow:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js login --site http://localhost:8000 --manual --json
-node packages/vibepresto-cli/bin/vibepresto.js login --site http://localhost:8000 --device-code <device_code> --completion-code <completion_code>
+npx @vibepresto/cli login --site http://localhost:8000 --manual --json
+npx @vibepresto/cli login --site http://localhost:8000 --device-code <device_code> --completion-code <completion_code>
 ```
 
 ### `whoami`
@@ -48,7 +56,7 @@ node packages/vibepresto-cli/bin/vibepresto.js login --site http://localhost:800
 Inspect the active saved session:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js whoami --site http://localhost:8000 --json
+npx @vibepresto/cli whoami --site http://localhost:8000 --json
 ```
 
 ### `pages search`
@@ -56,7 +64,7 @@ node packages/vibepresto-cli/bin/vibepresto.js whoami --site http://localhost:80
 Search WordPress pages before assigning a bundle:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js pages search --site http://localhost:8000 --query Home --json
+npx @vibepresto/cli pages search --site http://localhost:8000 --query Home --json
 ```
 
 ### `upload` with auto-bundling
@@ -64,9 +72,9 @@ node packages/vibepresto-cli/bin/vibepresto.js pages search --site http://localh
 Point at a local static site folder:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js upload \
+npx @vibepresto/cli upload \
   --site http://localhost:8000 \
-  --site-dir examples/landing-page \
+  --site-dir ./landing-page \
   --name "Landing page" \
   --json
 ```
@@ -74,9 +82,9 @@ node packages/vibepresto-cli/bin/vibepresto.js upload \
 Upload and assign to a page:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js upload \
+npx @vibepresto/cli upload \
   --site http://localhost:8000 \
-  --site-dir examples/landing-page \
+  --site-dir ./landing-page \
   --name "Landing page" \
   --page-id 2 \
   --json
@@ -91,9 +99,9 @@ Folder mode rules:
 ### `upload` with an existing ZIP
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js upload \
+npx @vibepresto/cli upload \
   --site http://localhost:8000 \
-  --zip examples/landing-page.zip \
+  --zip ./landing-page.zip \
   --name "Prebuilt bundle" \
   --json
 ```
@@ -101,7 +109,7 @@ node packages/vibepresto-cli/bin/vibepresto.js upload \
 ### `upload` with explicit files
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js upload \
+npx @vibepresto/cli upload \
   --site http://localhost:8000 \
   --html ./site/index.html \
   --css ./site/style.css \
@@ -113,7 +121,7 @@ node packages/vibepresto-cli/bin/vibepresto.js upload \
 Add extra assets:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js upload \
+npx @vibepresto/cli upload \
   --site http://localhost:8000 \
   --html ./site/index.html \
   --css ./site/style.css \
@@ -129,13 +137,13 @@ node packages/vibepresto-cli/bin/vibepresto.js upload \
 Clear local credentials:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js logout --site http://localhost:8000
+npx @vibepresto/cli logout --site http://localhost:8000
 ```
 
 Clear local credentials and revoke the remote session:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js logout --site http://localhost:8000 --revoke
+npx @vibepresto/cli logout --site http://localhost:8000 --revoke
 ```
 
 ## JSON output
@@ -169,9 +177,9 @@ Failure shape:
 Typical agent flow:
 
 ```bash
-node packages/vibepresto-cli/bin/vibepresto.js whoami --site http://localhost:8000 --json
-node packages/vibepresto-cli/bin/vibepresto.js pages search --site http://localhost:8000 --query sample-page --json
-node packages/vibepresto-cli/bin/vibepresto.js upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
+npx @vibepresto/cli whoami --site http://localhost:8000 --json
+npx @vibepresto/cli pages search --site http://localhost:8000 --query sample-page --json
+npx @vibepresto/cli upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
 ```
 
 The CLI is meant to be the main automation surface for Codex or other agents. Prefer `--json` so the caller can branch on stable response data.

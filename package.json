@@ -1,10 +1,13 @@
 {
-  "name": "vibepresto-cli",
+  "name": "@vibepresto/cli",
   "version": "0.1.0",
   "description": "CLI for uploading VibePresto bundles to WordPress.",
   "bin": {
     "vibepresto": "./bin/vibepresto.js"
   },
+  "files": [
+    "bin"
+  ],
   "type": "commonjs",
   "license": "MIT"
 }
