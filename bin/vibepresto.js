@@ -196,35 +196,31 @@ async function logout(options, json) {
 }
 
 async function uploadBundle(client, options) {
-    const site = client.site;
+    const input = await resolveUploadInput(options);
     const form = new FormData();
     const displayName = options.name ? String(options.name) : '';
 
-    if (options.zip) {
-        form.append('mode', 'zip');
-        if (displayName) {
-            form.append('display_name', displayName);
-        }
-        form.append('bundle_zip', await fileBlob(options.zip), path.basename(String(options.zip)));
+    form.append('mode', input.mode);
+
+    if (displayName) {
+        form.append('display_name', displayName);
+    }
+
+    if (input.mode === 'zip') {
+        form.append('bundle_zip', await fileBlob(input.zipPath), path.basename(input.zipPath));
     } else {
-        const html = stringOption(options.html, 'Either `--zip` or `--html` is required for `upload`.');
-        form.append('mode', 'separate');
-        if (displayName) {
-            form.append('display_name', displayName);
-        }
-        form.append('bundle_html', await fileBlob(html), path.basename(html));
+        form.append('bundle_html', await fileBlob(input.htmlPath), path.basename(input.htmlPath));
 
-        if (options.css) {
-            form.append('bundle_css', await fileBlob(options.css), path.basename(String(options.css)));
+        if (input.cssPath) {
+            form.append('bundle_css', await fileBlob(input.cssPath), path.basename(input.cssPath));
         }
 
-        if (options.js) {
-            form.append('bundle_js', await fileBlob(options.js), path.basename(String(options.js)));
+        if (input.jsPath) {
+            form.append('bundle_js', await fileBlob(input.jsPath), path.basename(input.jsPath));
         }
 
-        const assets = arrayOption(options.asset);
-        for (const asset of assets) {
-            form.append('bundle_assets[]', await fileBlob(asset), path.basename(asset));
+        for (const assetPath of input.assetPaths) {
+            form.append('bundle_assets[]', await fileBlob(assetPath), path.basename(assetPath));
         }
     }
 
@@ -232,18 +228,258 @@ async function uploadBundle(client, options) {
         form.append('assign_page_id', String(options.pageId));
     }
 
-    const response = await client.request('/bundles', {
-        method: 'POST',
-        body: form,
-    });
+    try {
+        const response = await client.request('/bundles', {
+            method: 'POST',
+            body: form,
+        });
+
+        return {
+            ok: true,
+            data: {
+                site_url: client.site,
+                upload_source: input.uploadSource,
+                auto_bundle: input.autoBundle,
+                entry_html_local: input.entryHtmlLocal,
+                verified_local_files: input.verifiedLocalFiles,
+                ...response.data,
+            },
+        };
+    } finally {
+        if (input.cleanup) {
+            await input.cleanup();
+        }
+    }
+}
+
+async function resolveUploadInput(options) {
+    if (options.siteDir) {
+        return prepareSiteDirectoryUpload(String(options.siteDir));
+    }
+
+    if (options.zip) {
+        const zipPath = path.resolve(String(options.zip));
+        await ensureReadableFile(zipPath, 'The ZIP bundle could not be read.');
+
+        return {
+            mode: 'zip',
+            zipPath,
+            uploadSource: 'zip',
+            autoBundle: false,
+            entryHtmlLocal: null,
+            verifiedLocalFiles: [],
+            cleanup: null,
+        };
+    }
+
+    const html = stringOption(options.html, 'One of `--site-dir`, `--zip`, or `--html` is required for `upload`.');
+    const htmlPath = path.resolve(html);
+    await ensureReadableFile(htmlPath, 'The HTML file could not be read.');
+
+    const cssPath = options.css ? path.resolve(String(options.css)) : null;
+    const jsPath = options.js ? path.resolve(String(options.js)) : null;
+    const assetPaths = arrayOption(options.asset).map((assetPath) => path.resolve(assetPath));
+
+    if (cssPath) {
+        await ensureReadableFile(cssPath, 'The CSS file could not be read.');
+    }
+
+    if (jsPath) {
+        await ensureReadableFile(jsPath, 'The JS file could not be read.');
+    }
+
+    for (const assetPath of assetPaths) {
+        await ensureReadableFile(assetPath, 'One of the asset files could not be read.');
+    }
 
     return {
-        ok: true,
-        data: {
-            site_url: site,
-            ...response.data,
+        mode: 'separate',
+        htmlPath,
+        cssPath,
+        jsPath,
+        assetPaths,
+        uploadSource: 'explicit-files',
+        autoBundle: false,
+        entryHtmlLocal: path.basename(htmlPath),
+        verifiedLocalFiles: [htmlPath].concat(cssPath ? [cssPath] : [], jsPath ? [jsPath] : [], assetPaths),
+        cleanup: null,
+    };
+}
+
+async function prepareSiteDirectoryUpload(siteDir) {
+    const rootDir = path.resolve(siteDir);
+    const indexPath = path.join(rootDir, 'index.html');
+    await ensureReadableFile(indexPath, 'The site directory must contain a readable `index.html` at its root.', 'missing_entrypoint');
+
+    const verification = await verifySiteDirectory(rootDir, indexPath);
+    const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'vibepresto-bundle-'));
+    const zipPath = path.join(tempDir, sanitizeFileComponent(path.basename(rootDir) || 'site') + '.zip');
+
+    try {
+        await zipDirectory(rootDir, zipPath);
+    } catch (error) {
+        await cleanupPath(tempDir);
+        throw error;
+    }
+
+    return {
+        mode: 'zip',
+        zipPath,
+        uploadSource: 'site-dir',
+        autoBundle: true,
+        entryHtmlLocal: 'index.html',
+        verifiedLocalFiles: verification.verifiedFiles,
+        cleanup: async function () {
+            await cleanupPath(tempDir);
         },
     };
+}
+
+async function verifySiteDirectory(rootDir, indexPath) {
+    const html = await fsp.readFile(indexPath, 'utf8');
+    const references = extractLocalAssetReferences(html);
+    const verified = [indexPath];
+
+    for (const reference of references) {
+        const resolvedPath = resolveLocalReference(rootDir, reference);
+        if (resolvedPath === null) {
+            throw cliError(
+                'unsupported_local_layout',
+                'The site directory contains a local reference that escapes the bundle root.',
+                EXIT_VALIDATION,
+                { reference }
+            );
+        }
+
+        await ensureReadableFile(
+            resolvedPath,
+            'A referenced local asset is missing from the site directory.',
+            'missing_local_asset',
+            { reference, resolved_path: resolvedPath }
+        );
+        verified.push(resolvedPath);
+    }
+
+    return {
+        verifiedFiles: Array.from(new Set(verified)),
+    };
+}
+
+function extractLocalAssetReferences(html) {
+    const references = new Set();
+    const pattern = /\b(?:href|src)\s*=\s*(["'])([^"'#]+)\1/gi;
+    let match;
+
+    while ((match = pattern.exec(html)) !== null) {
+        const candidate = String(match[2] || '').trim();
+        if (! isBundledLocalReference(candidate)) {
+            continue;
+        }
+
+        if (! /\.(?:html?|css|js)(?:[?#].*)?$/i.test(candidate)) {
+            continue;
+        }
+
+        references.add(stripQueryAndHash(candidate));
+    }
+
+    return Array.from(references);
+}
+
+function isBundledLocalReference(reference) {
+    if (! reference) {
+        return false;
+    }
+
+    if (reference.startsWith('#') || reference.startsWith('data:')) {
+        return false;
+    }
+
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(reference)) {
+        return false;
+    }
+
+    return true;
+}
+
+function stripQueryAndHash(reference) {
+    return reference.split('#')[0].split('?')[0];
+}
+
+function resolveLocalReference(rootDir, reference) {
+    const normalized = reference.replace(/\\/g, '/');
+    const resolved = path.resolve(rootDir, normalized);
+    const relative = path.relative(rootDir, resolved);
+
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        return null;
+    }
+
+    return resolved;
+}
+
+async function zipDirectory(sourceDir, outputZipPath) {
+    const result = await runProcess('zip', ['-qr', outputZipPath, '.'], { cwd: sourceDir });
+    if (result.code !== 0) {
+        throw cliError(
+            'bundle_zip_failed',
+            'The CLI could not create a ZIP bundle from the site directory.',
+            EXIT_SERVER,
+            { stderr: result.stderr.trim() }
+        );
+    }
+}
+
+async function runProcess(command, args, options = {}) {
+    return await new Promise((resolve, reject) => {
+        const child = spawn(command, args, {
+            cwd: options.cwd,
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', function (chunk) {
+            stdout += chunk.toString();
+        });
+
+        child.stderr.on('data', function (chunk) {
+            stderr += chunk.toString();
+        });
+
+        child.on('error', function (error) {
+            reject(cliError(
+                'process_spawn_failed',
+                'A required local command could not be started.',
+                EXIT_SERVER,
+                { command, cause: error.message }
+            ));
+        });
+
+        child.on('close', function (code) {
+            resolve({ code, stdout, stderr });
+        });
+    });
+}
+
+async function ensureReadableFile(filePath, message, code = 'bundle_verification_failed', details = {}) {
+    try {
+        const stat = await fsp.stat(filePath);
+        if (! stat.isFile()) {
+            throw new Error('not_a_file');
+        }
+        await fsp.access(filePath);
+    } catch (error) {
+        throw cliError(code, message, EXIT_VALIDATION, {
+            path: filePath,
+            ...details,
+        });
+    }
+}
+
+async function cleanupPath(targetPath) {
+    await fsp.rm(targetPath, { recursive: true, force: true });
 }
 
 async function createAuthenticatedClient(options) {
@@ -448,6 +684,7 @@ function printHelp() {
         '  vibepresto whoami --site <url> [--json]',
         '  vibepresto logout --site <url> [--revoke] [--json]',
         '  vibepresto pages search --site <url> --query <text> [--json]',
+        '  vibepresto upload --site <url> --site-dir <dir> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --zip <file> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --html <file> [--css <file>] [--js <file>] [--asset <file> ...] [--name <label>] [--page-id <id>] [--json]',
     ].join('\n');
@@ -475,6 +712,10 @@ function emitSuccess(data, json) {
         process.stdout.write('Authorized as: ' + data.user_display_name + '\n');
     } else {
         process.stdout.write('Success\n');
+    }
+
+    if (data.auto_bundle) {
+        process.stdout.write('Auto-bundled from local site directory.\n');
     }
 
     if (data.assigned_page_url) {
@@ -555,6 +796,10 @@ function arrayOption(value) {
 
 function normalizeSiteUrl(value) {
     return String(value).replace(/\/+$/, '');
+}
+
+function sanitizeFileComponent(value) {
+    return value.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'bundle';
 }
 
 async function fileBlob(filePath) {
