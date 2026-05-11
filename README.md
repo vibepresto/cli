@@ -1,6 +1,6 @@
 # VibePresto CLI
 
-CLI for uploading VibePresto bundles to WordPress through the plugin API.
+CLI for managing WordPress pages and uploading VibePresto bundles through the plugin API.
 
 ## Current scope
 
@@ -65,6 +65,51 @@ Search WordPress pages before assigning a bundle:
 
 ```bash
 npx vibepresto pages search --site http://localhost:8000 --query Home --json
+```
+
+### `pages list`
+
+Retrieve all pages, optionally filtered by status:
+
+```bash
+npx vibepresto pages list --site http://localhost:8000 --json
+npx vibepresto pages list --site http://localhost:8000 --status draft --json
+```
+
+### `pages create`
+
+Create a new WordPress page:
+
+```bash
+npx vibepresto pages create \
+  --site http://localhost:8000 \
+  --title "Landing Page" \
+  --slug landing-page \
+  --status draft \
+  --json
+```
+
+### `pages set-status`
+
+Change the status of an existing page:
+
+```bash
+npx vibepresto pages set-status \
+  --site http://localhost:8000 \
+  --page-id 2 \
+  --status publish \
+  --json
+```
+
+### `pages set-homepage`
+
+Set a page as the default WordPress homepage:
+
+```bash
+npx vibepresto pages set-homepage \
+  --site http://localhost:8000 \
+  --page-id 2 \
+  --json
 ```
 
 ### `upload` with auto-bundling
@@ -178,8 +223,10 @@ Typical agent flow:
 
 ```bash
 npx vibepresto whoami --site http://localhost:8000 --json
-npx vibepresto pages search --site http://localhost:8000 --query sample-page --json
+npx vibepresto pages create --site http://localhost:8000 --title "Sample Page" --status draft --json
 npx vibepresto upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
+npx vibepresto pages set-status --site http://localhost:8000 --page-id 2 --status publish --json
+npx vibepresto pages set-homepage --site http://localhost:8000 --page-id 2 --json
 ```
 
 The CLI is meant to be the main automation surface for Codex or other agents. Prefer `--json` so the caller can branch on stable response data.

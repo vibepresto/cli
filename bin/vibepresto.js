@@ -60,6 +60,34 @@ async function main() {
         return;
     }
 
+    if (command === 'pages' && subcommand === 'list') {
+        const client = await createAuthenticatedClient(options);
+        const response = await listPages(client, options);
+        emitSuccess(response.data, json);
+        return;
+    }
+
+    if (command === 'pages' && subcommand === 'create') {
+        const client = await createAuthenticatedClient(options);
+        const response = await createPage(client, options);
+        emitSuccess(response.data, json);
+        return;
+    }
+
+    if (command === 'pages' && subcommand === 'set-status') {
+        const client = await createAuthenticatedClient(options);
+        const response = await setPageStatus(client, options);
+        emitSuccess(response.data, json);
+        return;
+    }
+
+    if (command === 'pages' && subcommand === 'set-homepage') {
+        const client = await createAuthenticatedClient(options);
+        const response = await setPageHomepage(client, options);
+        emitSuccess(response.data, json);
+        return;
+    }
+
     if (command === 'upload') {
         const client = await createAuthenticatedClient(options);
         const response = await uploadBundle(client, options);
@@ -75,7 +103,7 @@ async function startLogin(options, json) {
     const payload = {
         client_name: 'VibePresto CLI',
         machine_name: os.hostname(),
-        scope: ['bundles:write', 'pages:read', 'pages:assign'],
+        scope: ['bundles:write', 'pages:read', 'pages:write', 'pages:assign', 'site:write'],
     };
 
     const response = await apiRequest(site, '/auth/device', {
@@ -251,6 +279,57 @@ async function uploadBundle(client, options) {
             await input.cleanup();
         }
     }
+}
+
+async function listPages(client, options) {
+    const params = new URLSearchParams();
+    if (options.status) {
+        params.set('status', String(options.status));
+    }
+
+    const endpoint = '/pages' + (params.size > 0 ? '?' + params.toString() : '');
+    return await client.request(endpoint);
+}
+
+async function createPage(client, options) {
+    const title = stringOption(options.title, '--title is required for `pages create`.');
+    const payload = { title };
+
+    if (options.slug) {
+        payload.slug = String(options.slug);
+    }
+
+    if (options.status) {
+        payload.status = String(options.status);
+    }
+
+    if (options.content) {
+        payload.content = String(options.content);
+    }
+
+    return await client.request('/pages', {
+        method: 'POST',
+        json: payload,
+    });
+}
+
+async function setPageStatus(client, options) {
+    const pageId = positiveIntOption(options.pageId, '--page-id is required for `pages set-status`.');
+    const status = stringOption(options.status, '--status is required for `pages set-status`.');
+
+    return await client.request('/pages/' + pageId + '/status', {
+        method: 'POST',
+        json: { status },
+    });
+}
+
+async function setPageHomepage(client, options) {
+    const pageId = positiveIntOption(options.pageId, '--page-id is required for `pages set-homepage`.');
+
+    return await client.request('/pages/' + pageId + '/homepage', {
+        method: 'POST',
+        json: {},
+    });
 }
 
 async function resolveUploadInput(options) {
@@ -684,7 +763,11 @@ function printHelp() {
         '  vibepresto login --site <url> --completion-code <code> [--device-code <code>] [--json]',
         '  vibepresto whoami --site <url> [--json]',
         '  vibepresto logout --site <url> [--revoke] [--json]',
+        '  vibepresto pages list --site <url> [--status <status>] [--json]',
         '  vibepresto pages search --site <url> --query <text> [--json]',
+        '  vibepresto pages create --site <url> --title <title> [--slug <slug>] [--status <status>] [--content <html>] [--json]',
+        '  vibepresto pages set-status --site <url> --page-id <id> --status <status> [--json]',
+        '  vibepresto pages set-homepage --site <url> --page-id <id> [--json]',
         '  vibepresto upload --site <url> --site-dir <dir> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --zip <file> [--name <label>] [--page-id <id>] [--json]',
         '  vibepresto upload --site <url> --html <file> [--css <file>] [--js <file>] [--asset <file> ...] [--name <label>] [--page-id <id>] [--json]',
@@ -708,8 +791,17 @@ function emitSuccess(data, json) {
         process.stdout.write('User code: ' + data.user_code + '\n');
     }
 
-    if (data.bundle_title) {
+    if (Array.isArray(data.items)) {
+        process.stdout.write('Pages: ' + data.items.length + '\n');
+        for (const item of data.items) {
+            const status = item.status ? ' [' + item.status + ']' : '';
+            const homepage = item.is_homepage ? ' (homepage)' : '';
+            process.stdout.write('- ' + item.id + ': ' + item.title + status + homepage + '\n');
+        }
+    } else if (data.bundle_title) {
         process.stdout.write('Uploaded bundle: ' + data.bundle_title + '\n');
+    } else if (data.page_title) {
+        process.stdout.write('Page: ' + data.page_title + '\n');
     } else if (data.user_display_name) {
         process.stdout.write('Authorized as: ' + data.user_display_name + '\n');
     } else {
@@ -722,6 +814,18 @@ function emitSuccess(data, json) {
 
     if (data.assigned_page_url) {
         process.stdout.write('Assigned page: ' + data.assigned_page_url + '\n');
+    }
+
+    if (data.page_status) {
+        process.stdout.write('Page status: ' + data.page_status + '\n');
+    }
+
+    if (data.page_url) {
+        process.stdout.write('Page URL: ' + data.page_url + '\n');
+    }
+
+    if (data.is_homepage) {
+        process.stdout.write('This page is now the homepage.\n');
     }
 }
 
@@ -786,6 +890,15 @@ function stringOption(value, message) {
     }
 
     return value;
+}
+
+function positiveIntOption(value, message) {
+    const parsed = Number.parseInt(String(value || ''), 10);
+    if (! Number.isInteger(parsed) || parsed < 1) {
+        throw cliError('usage_error', message, EXIT_USAGE);
+    }
+
+    return parsed;
 }
 
 function arrayOption(value) {
