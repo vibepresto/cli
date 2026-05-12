@@ -10,7 +10,7 @@
     "static-site"
   ],
   "bin": {
-    "vibepresto": "./bin/vibepresto.js"
+    "vibepresto": "bin/vibepresto.js"
   },
   "scripts": {
     "build": "node --check ./bin/vibepresto.js"
@@ -24,11 +24,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VibePresto/cli.git"
+    "url": "git+https://github.com/vibepresto/cli.git"
   },
   "bugs": {
-    "url": "https://github.com/VibePresto/cli/issues"
+    "url": "https://github.com/vibepresto/cli/issues"
   },
-  "homepage": "https://github.com/VibePresto/cli#readme",
+  "homepage": "https://github.com/vibepresto/cli#readme",
   "license": "MIT"
 }
