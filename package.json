@@ -12,6 +12,9 @@
   "bin": {
     "vibepresto": "./bin/vibepresto.js"
   },
+  "scripts": {
+    "build": "node --check ./bin/vibepresto.js"
+  },
   "files": [
     "bin"
   ],
