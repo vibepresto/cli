@@ -1,22 +1,17 @@
 # VibePresto CLI
 
-CLI for managing WordPress pages and versioned VibePresto bundles through the plugin API.
+CLI for managing WordPress pages, framework-aware static builds, versioned VibePresto bundles, and multi-route deployments through the plugin API.
 
-## Current scope
+## Scope
 
-This first pass targets simple static sites:
+The CLI supports two deployment styles:
 
-- `index.html` at the folder root
-- plain HTML, CSS, and JS assets
-- no build step, framework output detection, or dependency installation
+- simple single-page static uploads for raw HTML/CSS/JS bundles
+- framework-aware build, verify, route inspection, and deployment for static/exported frontend apps
 
-If you point the CLI at a local site folder, it verifies local HTML/CSS/JS references, creates a temporary ZIP bundle, and uploads that ZIP for you.
-
-When you upload to a page that already has a VibePresto bundle assigned, the new upload becomes the next version in that same bundle lineage automatically.
+Supported targets are static/exportable builds from common React, Next.js static export, Nuxt static export, Vite, Svelte/SvelteKit static output, TanStack static output, and similar projects that emit HTML plus assets on disk.
 
 ## Use with npx
-
-Run the published CLI without installing globally:
 
 ```bash
 npx vibepresto --help
@@ -24,137 +19,48 @@ npx vibepresto --help
 
 ## Run locally
 
-From this repo:
-
 ```bash
 node ./bin/vibepresto.js --help
 ```
 
-## Commands
+## Core commands
 
-### `login`
-
-Start device-style login and wait for approval:
+### Auth
 
 ```bash
 npx vibepresto login --site http://localhost:8000
-```
-
-Skip browser auto-open:
-
-```bash
-npx vibepresto login --site http://localhost:8000 --no-open
-```
-
-Manual flow:
-
-```bash
-npx vibepresto login --site http://localhost:8000 --manual --json
-npx vibepresto login --site http://localhost:8000 --device-code <device_code> --completion-code <completion_code>
-```
-
-### `whoami`
-
-Inspect the active saved session:
-
-```bash
 npx vibepresto whoami --site http://localhost:8000 --json
+npx vibepresto logout --site http://localhost:8000 --revoke
 ```
 
-### `pages search`
-
-Search WordPress pages before assigning a bundle:
+### Framework prep
 
 ```bash
-npx vibepresto pages search --site http://localhost:8000 --query Home --json
+npx vibepresto detect --project-dir ./landingpage --json
+npx vibepresto build --project-dir ./landingpage --json
+npx vibepresto verify --output-dir ./landingpage/dist --json
+npx vibepresto routes inspect --output-dir ./landingpage/dist --json
 ```
 
-### `bundles list`
-
-List bundle lineages and their current versions:
+Force SPA fallback mode for router apps:
 
 ```bash
-npx vibepresto bundles list --site http://localhost:8000 --json
+npx vibepresto routes inspect --output-dir ./dist --route-mode spa --json
 ```
 
-### `bundles versions`
-
-List all versions for a bundle lineage:
-
-```bash
-npx vibepresto bundles versions --site http://localhost:8000 --bundle-id 12 --json
-```
-
-### `bundles rollback`
-
-Roll a page back to an earlier bundle version:
-
-```bash
-npx vibepresto bundles rollback \
-  --site http://localhost:8000 \
-  --page-id 2 \
-  --version 1 \
-  --json
-```
-
-### `pages list`
-
-Retrieve all pages, optionally filtered by status:
+### Pages
 
 ```bash
 npx vibepresto pages list --site http://localhost:8000 --json
-npx vibepresto pages list --site http://localhost:8000 --status draft --json
+npx vibepresto pages search --site http://localhost:8000 --query Home --json
+npx vibepresto pages create --site http://localhost:8000 --title "Landing Page" --status draft --json
+npx vibepresto pages set-status --site http://localhost:8000 --page-id 2 --status publish --json
+npx vibepresto pages set-homepage --site http://localhost:8000 --page-id 2 --json
 ```
 
-### `pages create`
+### Upload
 
-Create a new WordPress page:
-
-```bash
-npx vibepresto pages create \
-  --site http://localhost:8000 \
-  --title "Landing Page" \
-  --slug landing-page \
-  --status draft \
-  --json
-```
-
-### `pages set-status`
-
-Change the status of an existing page:
-
-```bash
-npx vibepresto pages set-status \
-  --site http://localhost:8000 \
-  --page-id 2 \
-  --status publish \
-  --json
-```
-
-### `pages set-homepage`
-
-Set a page as the default WordPress homepage:
-
-```bash
-npx vibepresto pages set-homepage \
-  --site http://localhost:8000 \
-  --page-id 2 \
-  --json
-```
-
-### `upload` with auto-bundling
-
-Point at a local static site folder:
-
-```bash
-npx vibepresto upload \
-  --site http://localhost:8000 \
-  --site-dir ./landing-page \
-  --name "Landing page" \
-  --json
-```
-
-Upload and assign to a page:
+Simple static folder upload:
 
 ```bash
 npx vibepresto upload \
@@ -165,69 +71,80 @@ npx vibepresto upload \
   --json
 ```
 
-If page `2` already has a VibePresto bundle assigned, this upload becomes the next version in that same lineage instead of creating an unrelated duplicate bundle.
+Prebuilt artifact upload with route-aware metadata:
 
-Folder mode rules:
+```bash
+npx vibepresto upload \
+  --site http://localhost:8000 \
+  --zip ./dist.zip \
+  --bundle-kind multi-entry \
+  --route-manifest ./route-manifest.json \
+  --json
+```
+
+Existing single-page folder mode still works:
 
 - `index.html` must exist at the folder root
-- local HTML/CSS/JS references in `index.html` must resolve inside that folder
-- remote URLs like `https://...`, `//...`, `data:...`, and anchors are allowed
+- local HTML/CSS/JS references must resolve inside that folder
+- remote URLs, `data:` URLs, and anchors are allowed
 
-### `upload` with an existing ZIP
+### Deploy
+
+Build, verify, inspect routes, upload, resolve pages, optionally create missing pages, and create a deployment:
 
 ```bash
-npx vibepresto upload \
+npx vibepresto deploy \
   --site http://localhost:8000 \
-  --zip ./landing-page.zip \
-  --name "Prebuilt bundle" \
+  --project-dir ./landingpage \
   --json
 ```
 
-### `upload` with explicit files
+Deploy a prebuilt output directory in mixed mode:
 
 ```bash
-npx vibepresto upload \
+npx vibepresto deploy \
   --site http://localhost:8000 \
-  --html ./site/index.html \
-  --css ./site/style.css \
-  --js ./site/app.js \
-  --name "Separate files bundle" \
+  --output-dir ./dist \
+  --create-missing-pages \
   --json
 ```
 
-Add extra assets:
+Preview the route and page mapping plan without uploading:
 
 ```bash
-npx vibepresto upload \
+npx vibepresto deploy \
   --site http://localhost:8000 \
-  --html ./site/index.html \
-  --css ./site/style.css \
-  --js ./site/app.js \
-  --asset ./site/logo.png \
-  --asset ./site/font.woff2 \
-  --name "Separate files bundle" \
+  --output-dir ./dist \
+  --dry-run \
   --json
 ```
 
-### `logout`
+Useful deploy flags:
 
-Clear local credentials:
+- `--route-mode auto|manifest|spa`
+- `--create-missing-pages`
+- `--no-create-missing-pages`
+- `--page-status draft|publish|pending|private`
+- `--page-title-strategy from-manifest|from-route|explicit-prefix`
+- `--page-prefix <slug-prefix>`
+- `--homepage-route /`
+
+### Bundle and deployment history
 
 ```bash
-npx vibepresto logout --site http://localhost:8000
-```
+npx vibepresto bundles list --site http://localhost:8000 --json
+npx vibepresto bundles versions --site http://localhost:8000 --bundle-id 12 --json
+npx vibepresto bundles rollback --site http://localhost:8000 --page-id 2 --version 1 --json
 
-Clear local credentials and revoke the remote session:
-
-```bash
-npx vibepresto logout --site http://localhost:8000 --revoke
+npx vibepresto deployments list --site http://localhost:8000 --json
+npx vibepresto deployments show --site http://localhost:8000 --deployment-id 3 --json
+npx vibepresto deployments promote --site http://localhost:8000 --deployment-id 3 --bundle-version-id 18 --json
+npx vibepresto deployments rollback --site http://localhost:8000 --deployment-id 3 --version 1 --json
 ```
 
 ## JSON output
 
-Use `--json` for machine-readable automation output.
-
-Success shape:
+Success:
 
 ```json
 {
@@ -236,7 +153,7 @@ Success shape:
 }
 ```
 
-Failure shape:
+Failure:
 
 ```json
 {
@@ -249,16 +166,15 @@ Failure shape:
 }
 ```
 
-## LLM-friendly example
+## Agent flow
 
-Typical agent flow:
+Typical framework-aware flow:
 
 ```bash
 npx vibepresto whoami --site http://localhost:8000 --json
-npx vibepresto pages create --site http://localhost:8000 --title "Sample Page" --status draft --json
-npx vibepresto upload --site http://localhost:8000 --site-dir ./my-static-site --page-id 2 --json
-npx vibepresto pages set-status --site http://localhost:8000 --page-id 2 --status publish --json
-npx vibepresto pages set-homepage --site http://localhost:8000 --page-id 2 --json
+npx vibepresto build --project-dir ./my-app --json
+npx vibepresto routes inspect --output-dir ./my-app/dist --json
+npx vibepresto deploy --site http://localhost:8000 --output-dir ./my-app/dist --create-missing-pages --json
 ```
 
-The CLI is meant to be the main automation surface for Codex or other agents. Prefer `--json` so the caller can branch on stable response data.
+The CLI is the main automation surface for Codex or other agents. Prefer `--json` so callers can branch on stable response data.
